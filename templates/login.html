@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Authorized rescue-team sign-in for ResQTrace AI">
+  <title>Rescue Team Login | ResQTrace AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body class="auth-page">
+  <header class="site-header"><nav class="nav container" aria-label="Main navigation">
+    <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 4 34 10v10c0 8.5-5.7 13.5-14 17C11.7 33.5 6 28.5 6 20V10L20 4Z"/><path class="brand-line" d="M12 21h5l3-7 4 13 3-6h2"/></svg></span><span>ResQTrace<span class="brand-ai"> AI</span><small>DISASTER INTELLIGENCE</small></span></a>
+    <a class="auth-back" href="{{ url_for('index') }}">← Back to home</a>
+  </nav></header>
+  <main class="auth-main container">
+    <section class="auth-intro"><div class="eyebrow"><span class="eyebrow-dot"></span> AUTHORIZED ACCESS ONLY</div><h1>Rescue work needs<br><span>trusted access.</span></h1><p>Sign in with the account provided by your ResQTrace AI administrator to access the disaster-response dashboard.</p>
+      <div class="auth-points"><div><span>✓</span><div><strong>Protected dashboard</strong><small>Access is restricted to active accounts.</small></div></div><div><span>✓</span><div><strong>Accountable actions</strong><small>Important account activity is logged.</small></div></div><div><span>✓</span><div><strong>Evidence-aware workflow</strong><small>Review sample records and search gaps.</small></div></div></div>
+      <div class="auth-demo-note"><strong>Prototype notice</strong><p>This student prototype currently uses illustrative disaster data. It is not a live emergency service.</p></div>
+    </section>
+    <section class="auth-card"><div class="auth-card-icon">⌑</div><div class="panel-overline">RESQTRACE AI CONTROL CENTER</div><h2>Team sign in</h2><p class="auth-subtitle">Use your administrator-provided username and password.</p>
+      {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<div class="flash-list">{% for category, message in messages %}<div class="flash flash-{{ category }}" role="alert">{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}
+      <form method="post" action="{{ url_for('login', next=request.args.get('next', '')) }}" class="auth-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label for="username">Username</label><input id="username" name="username" type="text" autocomplete="username" minlength="3" maxlength="60" required autofocus placeholder="Enter your username">
+        <label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Enter your password">
+        <button class="button button-primary auth-submit" type="submit">Sign in securely <span aria-hidden="true">→</span></button>
+      </form>
+      <p class="auth-admin-note">Accounts are created by an administrator. Public self-registration is disabled.</p>
+    </section>
+  </main>
+  <footer class="auth-footer">ResQTrace AI · Student prototype · Not a live emergency service</footer>
+</body></html>
