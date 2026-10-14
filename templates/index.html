@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ResQTrace AI helps disaster response teams track search evidence, identify uncertain areas, and prioritize further investigation.">
+  <title>ResQTrace AI | Disaster Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <header class="site-header" id="home">
+    <nav class="nav container" aria-label="Main navigation">
+      <a class="brand" href="#home" aria-label="ResQTrace AI home">
+        <span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 4 34 10v10c0 8.5-5.7 13.5-14 17C11.7 33.5 6 28.5 6 20V10L20 4Z"/><path class="brand-line" d="M12 21h5l3-7 4 13 3-6h2"/></svg></span>
+        <span>ResQTrace<span class="brand-ai"> AI</span><small>DISASTER INTELLIGENCE</small></span>
+      </a>
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle navigation" aria-expanded="false"><span></span><span></span><span></span></button>
+      <div class="nav-links" id="navLinks">
+        <a class="nav-link active" href="#home">Home</a>
+        <a class="nav-link" href="#features">Features</a>
+        <a class="nav-link" href="#workflow">How it works</a>
+        <a class="nav-link" href="#about">About</a>
+        <a class="nav-cta" href="{{ url_for('dashboard') }}">Explore dashboard <span aria-hidden="true">↗</span></a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero container">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="eyebrow-dot"></span> INNOVATION MISSION 6 <span class="eyebrow-divider">/</span> DISASTER RESPONSE</div>
+        <h1>Know what's found.<br><span>Discover what's missing.</span></h1>
+        <p class="hero-text">A smarter way to understand disaster zones. ResQTrace AI brings aerial-image analysis, search history, and uncertainty-aware priorities into one clear picture.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="{{ url_for('dashboard') }}">Explore dashboard <span aria-hidden="true">→</span></a>
+          <a class="button button-secondary" href="#workflow"><span class="play-icon" aria-hidden="true">▶</span> See how it works</a>
+        </div>
+        <div class="hero-note"><span class="note-icon">✓</span> Software-only prototype · No physical drone required</div>
+      </div>
+      <div class="hero-visual" aria-label="Illustration of a disaster response map">
+        <div class="visual-topline"><span><i class="live-dot"></i> RESPONSE OVERVIEW</span><span class="map-tag">ILLUSTRATIVE MAP</span></div>
+        <div class="map-art">
+          <div class="map-river"></div>
+          <div class="map-road road-one"></div><div class="map-road road-two"></div><div class="map-road road-three"></div>
+          <div class="map-grid"></div>
+          <div class="map-label label-one"><span class="pin pin-red"></span><span><b>Zone A</b><small>Person detected</small></span></div>
+          <div class="map-label label-two"><span class="pin pin-amber"></span><span><b>Zone B</b><small>Evidence uncertain</small></span></div>
+          <div class="map-label label-three"><span class="pin pin-green"></span><span><b>Zone C</b><small>Recently reviewed</small></span></div>
+          <div class="map-coordinates">12.2958° N&nbsp;&nbsp; 76.6394° E <span>DEMO AREA</span></div>
+          <div class="map-compass"><span>N</span><b>↑</b></div>
+        </div>
+        <div class="visual-footer"><div><span class="footer-icon orange">!</span><span><b>Unknown areas matter</b><small>Don't mistake missing evidence for safety.</small></span></div><span class="footer-arrow">↗</span></div>
+        <div class="floating-chip"><span class="chip-icon">◎</span><span><b>Evidence-aware</b><small>Search priorities</small></span></div>
+      </div>
+    </section>
+
+    <section class="trust-strip container" aria-label="Platform capabilities">
+      <div><span class="trust-icon">⌁</span><span>AI-assisted image review</span></div>
+      <div><span class="trust-icon">⌖</span><span>GIS-based situational awareness</span></div>
+      <div><span class="trust-icon">◷</span><span>Persistent search history</span></div>
+      <div><span class="trust-icon">↗</span><span>Explainable priorities</span></div>
+    </section>
+
+    <section class="section container" id="features">
+      <div class="section-heading">
+        <div><div class="section-kicker">ONE PLATFORM · FOUR CAPABILITIES</div><h2>Turn scattered evidence<br>into <span>clear next steps.</span></h2></div>
+        <p>ResQTrace AI is designed to help responders see what is known, what is uncertain, and where more investigation may be valuable.</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card"><div class="feature-icon icon-orange"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m5 17 5-4 3 2 3-4 3 6"/></svg></div><div class="card-number">01 / ANALYZE</div><h3>AI Image Analysis</h3><p>Review aerial imagery for visible people, damaged structures, and relevant objects using a suitable computer-vision model.</p><span class="card-link">Evidence from imagery <span>↗</span></span></article>
+        <article class="feature-card"><div class="feature-icon icon-green"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Z"/><path d="M9 3v15M15 6v15"/></svg></div><div class="card-number">02 / MAP</div><h3>Disaster Memory Map</h3><p>Keep a location-based record of observations, search status, timestamps, and evidence quality.</p><span class="card-link">A map that remembers <span>↗</span></span></article>
+        <article class="feature-card"><div class="feature-icon icon-amber"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16h.01"/></svg></div><div class="card-number">03 / PRIORITIZE</div><h3>Unknown-Area Detection</h3><p>Highlight areas that are unsearched, obscured, or supported by outdated evidence instead of assuming they are safe.</p><span class="card-link">Find the information gaps <span>↗</span></span></article>
+        <article class="feature-card"><div class="feature-icon icon-dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/><path d="M7 19h4a3 3 0 0 0 3-3v-2a3 3 0 0 1 3-3h2M19 7V5"/></svg></div><div class="card-number">04 / RESPOND</div><h3>Adaptive Rescue Planning</h3><p>Recommend investigation priorities and routes around known hazards as new information becomes available.</p><span class="card-link">Support better decisions <span>↗</span></span></article>
+      </div>
+    </section>
+
+    <section class="memory-section" id="about">
+      <div class="container memory-layout">
+        <div class="memory-copy"><div class="section-kicker">THE CORE INNOVATION</div><h2>What don't<br>we <span>know?</span></h2><p>A location with no detected survivor isn't automatically safe. An unclear image isn't a completed search. ResQTrace AI keeps these distinctions visible so teams can make better-informed decisions.</p><a class="text-link" href="#workflow">Explore the workflow <span>→</span></a></div>
+        <div class="status-panel">
+          <div class="panel-header"><div><span class="panel-overline">DISASTER MEMORY MAP</span><h3>Evidence status</h3></div><span class="demo-badge">SAMPLE VIEW</span></div>
+          <div class="status-list">
+            <div class="status-row"><span class="status-symbol status-red">!</span><span class="status-name"><b>Survivor detected</b><small>Flag for human assessment</small></span><span class="status-count">Priority</span></div>
+            <div class="status-row"><span class="status-symbol status-amber">?</span><span class="status-name"><b>Uncertain</b><small>Image is obscured or inconclusive</small></span><span class="status-count">Review</span></div>
+            <div class="status-row"><span class="status-symbol status-grey">—</span><span class="status-name"><b>Not searched</b><small>No relevant evidence available</small></span><span class="status-count">Unknown</span></div>
+            <div class="status-row"><span class="status-symbol status-green">✓</span><span class="status-name"><b>Reviewed</b><small>Evidence recorded with timestamp</small></span><span class="status-count">Logged</span></div>
+            <div class="status-row"><span class="status-symbol status-orange">↻</span><span class="status-name"><b>Evidence outdated</b><small>Conditions may have changed</small></span><span class="status-count">Recheck</span></div>
+          </div>
+          <p class="panel-footnote">Illustrative statuses. A negative detection does not prove an area is safe.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section container workflow-section" id="workflow">
+      <div class="section-heading centered"><div><div class="section-kicker">A SIMPLE, TRACEABLE PROCESS</div><h2>From image to <span>next action.</span></h2></div><p>Each step adds context to the next decision. The system updates its recommendations when evidence changes.</p></div>
+      <div class="workflow-grid">
+        <div class="workflow-step"><span class="step-index">01</span><div class="step-icon">↑</div><h3>Upload</h3><p>Add recorded aerial images, geographic data, or a simulated field report.</p></div>
+        <div class="workflow-connector">→</div>
+        <div class="workflow-step"><span class="step-index">02</span><div class="step-icon">⌕</div><h3>Analyze</h3><p>Review visible objects, image quality, and available location information.</p></div>
+        <div class="workflow-connector">→</div>
+        <div class="workflow-step"><span class="step-index">03</span><div class="step-icon">▦</div><h3>Remember</h3><p>Save evidence status and history for each mapped location.</p></div>
+        <div class="workflow-connector">→</div>
+        <div class="workflow-step"><span class="step-index">04</span><div class="step-icon">↗</div><h3>Prioritize</h3><p>Explain which areas may need further investigation and why.</p></div>
+      </div>
+    </section>
+
+    <section class="cta-section container">
+      <div class="cta-inner"><div class="cta-orb orb-one"></div><div class="cta-orb orb-two"></div><div class="cta-content"><div class="section-kicker">BUILT FOR BETTER-INFORMED RESPONSE</div><h2>Make every observation<br><span>count.</span></h2><p>Explore the idea behind an evidence-aware disaster response platform.</p><a href="#features" class="button button-light">Explore capabilities <span>→</span></a></div><div class="cta-mark" aria-hidden="true">R<span>Q</span></div></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-main"><a class="brand footer-brand" href="#home"><span class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 4 34 10v10c0 8.5-5.7 13.5-14 17C11.7 33.5 6 28.5 6 20V10L20 4Z"/><path class="brand-line" d="M12 21h5l3-7 4 13 3-6h2"/></svg></span><span>ResQTrace<span class="brand-ai"> AI</span><small>DISASTER INTELLIGENCE</small></span></a><p>A proposed software platform for evidence-aware disaster search and decision support.</p><a class="back-top" href="#home">Back to top ↑</a></div>
+    <div class="container footer-bottom"><span>Innovation Mission 6 · Student Prototype</span><span>Designed to support human decisions, not replace responders.</span></div>
+  </footer>
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
