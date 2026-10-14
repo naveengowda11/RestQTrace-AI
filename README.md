@@ -1,4 +1,4 @@
-# ResQTrace AI — Phase 1C: Authentication and Access Control
+# ResQTrace AI — Phase 1B: Authentication and Access Control
 
 A software-only student prototype for Innovation Mission 6. This version includes the landing page, a protected illustrative dashboard, SQLite-backed user accounts, admin-managed accounts, and an audit log. Disaster-zone information and priority scores remain sample data, not live emergency information.
 
