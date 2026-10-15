@@ -156,6 +156,27 @@ def init_db():
             db.execute(statement)
     db.commit()
 
+    # Optional first-admin bootstrap for hosts where interactive Shell access is unavailable.
+    # Set both variables in the hosting provider's environment settings; never hardcode passwords.
+    admin_username = os.environ.get('RESQTRACE_ADMIN_USERNAME', '').strip()
+    admin_password = os.environ.get('RESQTRACE_ADMIN_PASSWORD', '')
+    if admin_username and admin_password:
+        if (len(admin_username) < 3 or len(admin_username) > 60
+                or not admin_username.replace('_', '').replace('-', '').isalnum()):
+            raise RuntimeError('RESQTRACE_ADMIN_USERNAME must be 3-60 characters using letters, numbers, hyphens, or underscores.')
+        if len(admin_password) < 12:
+            raise RuntimeError('RESQTRACE_ADMIN_PASSWORD must be at least 12 characters.')
+        existing_admin = db.execute(
+            'SELECT id FROM users WHERE username = ? COLLATE NOCASE',
+            (admin_username,),
+        ).fetchone()
+        if not existing_admin:
+            db.execute(
+                'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
+                (admin_username, generate_password_hash(admin_password), 'admin'),
+            )
+            db.commit()
+
 
 def load_georeference(uploaded_file):
     """Read an optional affine pixel-to-WGS84 transform sidecar; never infer coordinates."""
