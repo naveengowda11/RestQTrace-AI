@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unknown Zones | ResQTrace AI</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/premium.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/redesign-v2.css') }}">
+<style>
+.uz-wrap{max-width:1180px;margin:auto;padding:32px 18px 50px}.uz-head{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap}.uz-head h1{margin:6px 0}.uz-head p{max-width:760px;color:#68776e}.uz-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin:22px 0}.uz-stat,.uz-panel{background:#fff;border:1px solid #e1e9e3;border-radius:15px}.uz-stat{padding:18px}.uz-stat span{display:block;color:#68776e;font-size:13px}.uz-stat strong{display:block;font-size:28px;color:#174b35;margin-top:7px}.uz-panel{overflow:hidden}.uz-panel-head{padding:20px;border-bottom:1px solid #e8eee9}.uz-panel-head h2{margin:0 0 5px}.uz-panel-head p{margin:0;color:#68776e;font-size:14px}.uz-table-wrap{overflow-x:auto}.uz-table{width:100%;border-collapse:collapse;min-width:760px}.uz-table th,.uz-table td{padding:14px 16px;text-align:left;vertical-align:top;border-bottom:1px solid #edf1ee}.uz-table th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#68776e;background:#f8faf8}.uz-table small{display:block;color:#68776e;margin-top:5px;max-width:300px;white-space:normal}.uz-status{display:inline-block;padding:5px 9px;border-radius:999px;background:#fff4d9;color:#805b12;font-size:12px;font-weight:700}.uz-status.old{background:#fce8e6;color:#963a32}.uz-status.other{background:#eaf0ed;color:#43574b}.uz-score{font-weight:700;color:#174b35}.uz-empty{padding:42px 20px;text-align:center;color:#64746b}@media(max-width:600px){.uz-wrap{padding:24px 12px}.uz-head h1{font-size:28px}}
+</style>
+</head>
+<body class="dashboard-body">
+<header class="site-header dashboard-header"><nav class="nav container">
+<a class="brand" href="{{ url_for('dashboard') }}">ResQTrace <span class="brand-ai">AI</span></a>
+<div class="dashboard-nav">
+<a href="{{ url_for('dashboard') }}">Dashboard</a>
+<a href="{{ url_for('image_analysis') }}">Image analysis</a>
+<a href="{{ url_for('search_coverage') }}">Search Coverage</a>
+<a href="{{ url_for('unknown_zones') }}" class="active">Unknown Zones</a>
+<form method="post" action="{{ url_for('logout') }}" class="logout-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="logout-button" type="submit">Sign out</button></form>
+</div></nav></header>
+<main class="uz-wrap">
+<div class="uz-head"><div><div class="section-kicker">EVIDENCE REVIEW</div><h1>Unknown <span>Zones.</span></h1>
+<p>Review zones with uncertain, outdated, or incomplete image-analysis evidence. A flagged record is not proof that survivors are present or absent, and it must not be treated as a safety confirmation.</p></div>
+<a class="button button-primary" href="{{ url_for('image_analysis') }}">＋ Analyse new image</a></div>
+<section class="uz-stats">
+<article class="uz-stat"><span>Records needing review</span><strong>{{ counts.total }}</strong></article>
+<article class="uz-stat"><span>Uncertain evidence</span><strong>{{ counts.uncertain }}</strong></article>
+<article class="uz-stat"><span>Outdated evidence</span><strong>{{ counts.outdated }}</strong></article>
+<article class="uz-stat"><span>Other incomplete results</span><strong>{{ counts.other }}</strong></article>
+</section>
+<section class="uz-panel"><div class="uz-panel-head"><h2>Zones requiring attention</h2><p>Up to 250 matching image records, ordered by priority and newest record.</p></div>
+{% if unknown_zones %}
+<div class="uz-table-wrap"><table class="uz-table"><thead><tr><th>Zone / image</th><th>Evidence status</th><th>Priority</th><th>Image / processing</th><th>Created</th><th>Action</th></tr></thead><tbody>
+{% for item in unknown_zones %}
+<tr><td><strong>{{ item.zone_name }}</strong><small>{{ item.original_name }}</small></td>
+<td>{% set status = item.evidence_status or 'unknown' %}<span class="uz-status {% if status == 'outdated' %}old{% elif status not in ['uncertain', 'outdated'] %}other{% endif %}">{{ status|replace('_',' ')|title }}</span><small>{{ item.priority_reason }}</small></td>
+<td><span class="uz-score">{{ item.priority_score }}/100</span></td>
+<td>{{ item.image_quality }}<small>{{ item.inference_status|replace('_',' ')|title }}</small></td>
+<td>{{ item.created_at }}</td><td><a class="inspect-btn" href="{{ url_for('analysis_detail', analysis_id=item.id) }}">Review record</a></td></tr>
+{% endfor %}
+</tbody></table></div>
+{% else %}
+<div class="uz-empty"><h3>No unknown zones found</h3><p>No saved image records currently match the review filters.</p><a class="button button-primary" href="{{ url_for('image_analysis') }}">Upload an image</a></div>
+{% endif %}
+</section>
+<footer class="dashboard-footer" style="margin-top:26px"><span>ResQTrace AI · Disaster intelligence</span><span>Review flags are triage aids; authorized personnel must verify evidence.</span></footer>
+</main></body></html>
