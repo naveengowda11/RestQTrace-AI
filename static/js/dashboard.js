@@ -2,9 +2,9 @@
   const zones = Array.isArray(window.RESQ_ZONES) ? window.RESQ_ZONES : [];
   const colors = { detected: '#d95f4c', uncertain: '#d6a23e', unsearched: '#98a39b', reviewed: '#4e986a', outdated: '#e58a45' };
   let map;
-  if (window.L && document.getElementById('disasterMap')) {
-    // Coordinates are fictional demonstration markers around a generic sample area.
-    map = L.map('disasterMap', { scrollWheelZoom: false }).setView([12.2958, 76.6394], 13);
+  if (window.L && document.getElementById('disasterMap') && zones.some((zone) => typeof zone.lat === 'number' && typeof zone.lng === 'number')) {
+    const firstMappedZone = zones.find((zone) => typeof zone.lat === 'number' && typeof zone.lng === 'number');
+    map = L.map('disasterMap', { scrollWheelZoom: false }).setView([firstMappedZone.lat, firstMappedZone.lng], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors'
@@ -20,7 +20,7 @@
     });
   } else {
     const mapBox = document.getElementById('disasterMap');
-    if (mapBox) mapBox.innerHTML = '<div class="map-offline">The interactive map needs an internet connection to load its map library and tiles. The zone table remains available below.</div>';
+    if (mapBox) mapBox.innerHTML = '<div class="map-offline">No zone coordinates are available yet. Add verified coordinates to zone records to display them on the map. The evidence register remains available below.</div>'; 
   }
 
   const filter = document.getElementById('statusFilter');
@@ -53,7 +53,7 @@
       detail('Area', zone.area),
       detail('Evidence note', zone.note),
       detail('Suggested next step', zone.action),
-      detail('Data note', 'Illustrative sample record only. This is not a real rescue report.')
+      detail('Recorded evidence', 'Details are based on the saved zone record.')
     ].join('');
     modal.hidden = false;
     document.getElementById('closeModal').focus();
