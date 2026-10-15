@@ -721,70 +721,104 @@ def memory_map():
 @app.route('/visual-compare', methods=['GET', 'POST'])
 @login_required
 def visual_compare():
-    """Compare two uploaded images from one zone using a simple pixel-difference preview."""
+    """Compare two stored observations from one zone using a normalized pixel-difference preview."""
     db = get_db()
-    zones = db.execute("""SELECT zone_name, COUNT(*) AS image_count
-        FROM image_analyses GROUP BY zone_name ORDER BY zone_name COLLATE NOCASE""").fetchall()
+    zones = db.execute("""
+        SELECT TRIM(zone_name) AS zone_name, COUNT(*) AS image_count
+        FROM image_analyses
+        WHERE TRIM(COALESCE(zone_name, '')) <> ''
+        GROUP BY LOWER(TRIM(zone_name))
+        ORDER BY zone_name COLLATE NOCASE
+    """).fetchall()
+
     selected_zone = request.values.get('zone_name', '').strip()
     images = []
     comparison = None
     error = None
+
     if selected_zone:
-        images = db.execute("""SELECT id, original_name, stored_name, width, height, image_quality,
-            analysis_mode, created_at FROM image_analyses WHERE zone_name = ? ORDER BY id DESC""",
-            (selected_zone,)).fetchall()
+        images = db.execute("""
+            SELECT id, zone_name, original_name, stored_name, width, height,
+                   image_quality, analysis_mode, created_at
+            FROM image_analyses
+            WHERE LOWER(TRIM(zone_name)) = LOWER(TRIM(?))
+            ORDER BY created_at ASC, id ASC
+        """, (selected_zone,)).fetchall()
+
     if request.method == 'POST':
         csrf_protect()
         try:
             older_id = int(request.form.get('older_id', '0'))
             newer_id = int(request.form.get('newer_id', '0'))
-        except ValueError:
+        except (TypeError, ValueError):
             older_id, newer_id = 0, 0
+
         if not selected_zone:
-            error = 'Choose a zone first.'
-        elif older_id == newer_id or not older_id or not newer_id:
-            error = 'Choose two different observations to compare.'
+            error = 'Choose a zone first, then load its images.'
+        elif len(images) < 2:
+            error = 'This zone has fewer than two saved images. Upload another observation before comparing.'
+        elif not older_id or not newer_id or older_id == newer_id:
+            error = 'Select two different observations.'
         else:
-            rows = db.execute("""SELECT id, zone_name, original_name, stored_name, width, height, created_at
-                FROM image_analyses WHERE id IN (?, ?)""", (older_id, newer_id)).fetchall()
+            rows = db.execute("""
+                SELECT id, zone_name, original_name, stored_name, width, height, created_at
+                FROM image_analyses WHERE id IN (?, ?)
+            """, (older_id, newer_id)).fetchall()
             by_id = {row['id']: dict(row) for row in rows}
-            if len(by_id) != 2 or any((row['zone_name'] or '').strip().casefold() != selected_zone.casefold() for row in by_id.values()):
-                error = 'Both observations must belong to the selected zone.'
+
+            if len(by_id) != 2 or any(
+                (row['zone_name'] or '').strip().casefold() != selected_zone.casefold()
+                for row in by_id.values()
+            ):
+                error = 'Both selected images must belong to the selected zone. Reload the zone and try again.'
             else:
                 older, newer = by_id[older_id], by_id[newer_id]
-                try:
-                    old_path, new_path = (UPLOAD_DIR / older['stored_name']).resolve(), (UPLOAD_DIR / newer['stored_name']).resolve()
-                    if UPLOAD_DIR.resolve() not in old_path.parents or UPLOAD_DIR.resolve() not in new_path.parents or not old_path.is_file() or not new_path.is_file():
-                        raise OSError('Stored image is missing')
-                    with Image.open(old_path) as im:
-                        old_image = im.convert('RGB')
-                    with Image.open(new_path) as im:
-                        new_image = im.convert('RGB')
-                    # Normalized thumbnail comparison is a rough screening aid only; images may not be aligned.
-                    size = (320, 320)
-                    old_thumb = old_image.copy(); old_thumb.thumbnail(size)
-                    new_thumb = new_image.copy(); new_thumb.thumbnail(size)
-                    canvas_size = (max(old_thumb.width, new_thumb.width), max(old_thumb.height, new_thumb.height))
-                    old_canvas = Image.new('RGB', canvas_size, 'white')
-                    new_canvas = Image.new('RGB', canvas_size, 'white')
-                    old_canvas.paste(old_thumb, ((canvas_size[0]-old_thumb.width)//2, (canvas_size[1]-old_thumb.height)//2))
-                    new_canvas.paste(new_thumb, ((canvas_size[0]-new_thumb.width)//2, (canvas_size[1]-new_thumb.height)//2))
-                    diff = ImageChops.difference(old_canvas, new_canvas).convert('L')
-                    diff = ImageEnhance.Contrast(diff).enhance(2.5)
-                    mean_diff = sum(ImageStat.Stat(diff).mean) / len(ImageStat.Stat(diff).mean)
-                    # Fraction of pixels with a visible intensity difference, useful for triage not truth.
-                    changed = sum(1 for value in diff.getdata() if value > 35)
-                    total = diff.width * diff.height
-                    change_pct = round((changed / total) * 100, 1) if total else 0
-                    buf = BytesIO(); diff.save(buf, format='PNG'); diff_data = buf.getvalue()
-                    comparison = {
-                        'older': older, 'newer': newer, 'change_pct': change_pct,
-                        'mean_difference': round(mean_diff, 1),
-                        'diff_data': __import__('base64').b64encode(diff_data).decode('ascii'),
-                        'warning': 'Pixel differences can come from camera angle, zoom, lighting, image alignment, or compression. This score does not identify flooding or prove physical change.'
-                    }
-                except (OSError, ValueError) as exc:
-                    error = 'Could not compare these files. Check that both uploaded images are still available.'
+                if (older['created_at'], older['id']) > (newer['created_at'], newer['id']):
+                    error = 'The earlier image must be older than the later image. Please swap your selections.'
+                else:
+                    try:
+                        old_path = (UPLOAD_DIR / older['stored_name']).resolve()
+                        new_path = (UPLOAD_DIR / newer['stored_name']).resolve()
+                        upload_root = UPLOAD_DIR.resolve()
+                        if (upload_root not in old_path.parents or upload_root not in new_path.parents
+                                or not old_path.is_file() or not new_path.is_file()):
+                            raise OSError('Stored image is missing.')
+
+                        from PIL import ImageOps
+                        canvas_size = (320, 320)
+
+                        def comparison_canvas(path):
+                            with Image.open(path) as source:
+                                source.verify()
+                            with Image.open(path) as source:
+                                image = ImageOps.exif_transpose(source).convert('RGB')
+                                image.thumbnail(canvas_size)
+                                canvas = Image.new('RGB', canvas_size, (255, 255, 255))
+                                canvas.paste(image, ((canvas_size[0] - image.width) // 2,
+                                                     (canvas_size[1] - image.height) // 2))
+                                return canvas
+
+                        old_canvas = comparison_canvas(old_path)
+                        new_canvas = comparison_canvas(new_path)
+                        diff = ImageChops.difference(old_canvas, new_canvas).convert('L')
+                        diff = ImageEnhance.Contrast(diff).enhance(2.0)
+                        mean_diff = float(ImageStat.Stat(diff).mean[0])
+                        changed = sum(1 for value in diff.getdata() if value > 35)
+                        total = diff.width * diff.height
+                        change_pct = round((changed / total) * 100, 1) if total else 0
+                        buf = BytesIO()
+                        diff.save(buf, format='PNG')
+                        comparison = {
+                            'older': older,
+                            'newer': newer,
+                            'change_pct': change_pct,
+                            'mean_difference': round(mean_diff, 1),
+                            'diff_data': __import__('base64').b64encode(buf.getvalue()).decode('ascii'),
+                            'warning': 'This is a basic pixel-difference preview, not AI hazard detection. Camera angle, framing, lighting, weather, and compression can affect the result. Human review is required.'
+                        }
+                    except (OSError, ValueError, UnidentifiedImageError):
+                        error = 'One of the stored images is missing or unreadable. Please re-upload that image and try again.'
+
     return render_template('visual_compare.html', zones=zones, images=images,
                            selected_zone=selected_zone, comparison=comparison, error=error)
 
