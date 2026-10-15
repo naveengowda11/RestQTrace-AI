@@ -1,2 +1,5 @@
 Flask>=3.0,<4.0
 Pillow>=10.0,<13.0
+# CPU-compatible inference dependencies used by services/inference.py
+ultralytics>=8.3,<9.0
+transformers>=4.45,<5.0
