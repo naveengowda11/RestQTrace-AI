@@ -1,19 +1,26 @@
 import os
 import secrets
 import sqlite3
-from datetime import timedelta
+import json
+import uuid
+from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
 
 import click
 from flask import (Flask, abort, flash, g, redirect, render_template, request,
-                   session, url_for)
+                   send_file, session, url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
+from PIL import Image, ImageStat, UnidentifiedImageError
 
 BASE_DIR = Path(__file__).resolve().parent
 INSTANCE_DIR = BASE_DIR / 'instance'
 INSTANCE_DIR.mkdir(exist_ok=True)
 DB_PATH = INSTANCE_DIR / 'resqtrace.sqlite3'
+UPLOAD_DIR = INSTANCE_DIR / 'uploads'
+UPLOAD_DIR.mkdir(exist_ok=True)
+ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp'}
 
 app = Flask(__name__)
 # Persist a local development key so sessions survive restarts. Set RESQTRACE_SECRET_KEY
@@ -70,6 +77,20 @@ def init_db():
             target_username TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
+        );
+        CREATE TABLE IF NOT EXISTS image_analyses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            uploaded_by INTEGER,
+            original_name TEXT NOT NULL,
+            stored_name TEXT NOT NULL UNIQUE,
+            width INTEGER NOT NULL,
+            height INTEGER NOT NULL,
+            image_quality TEXT NOT NULL,
+            analysis_mode TEXT NOT NULL,
+            detections_json TEXT NOT NULL DEFAULT '[]',
+            summary TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(uploaded_by) REFERENCES users(id) ON DELETE SET NULL
         );
     ''')
     db.commit()
@@ -204,6 +225,131 @@ def dashboard():
     return render_template('dashboard.html', zones=ZONES, priorities=PRIORITIES, metrics=metrics)
 
 
+@app.route('/analysis', methods=['GET', 'POST'])
+@login_required
+def image_analysis():
+    # Upload an aerial image and run optional local object detection.
+    db = get_db()
+    if request.method == 'POST':
+        csrf_protect()
+        uploaded = request.files.get('image')
+        if not uploaded or not uploaded.filename:
+            flash('Choose an image file before submitting.', 'error')
+            return redirect(url_for('image_analysis'))
+
+        original_name = secure_filename(uploaded.filename) or 'uploaded-image'
+        suffix = Path(original_name).suffix.lower()
+        if suffix not in ALLOWED_IMAGE_EXTENSIONS:
+            flash('Use a JPG, JPEG, PNG, or WEBP image.', 'error')
+            return redirect(url_for('image_analysis'))
+
+        stored_name = f'{uuid.uuid4().hex}{suffix}'
+        stored_path = UPLOAD_DIR / stored_name
+        try:
+            # Decode and validate the image before keeping it. Pillow verifies file content,
+            # not just the filename extension.
+            uploaded.stream.seek(0)
+            with Image.open(uploaded.stream) as image:
+                image.verify()
+            uploaded.stream.seek(0)
+            with Image.open(uploaded.stream) as image:
+                image = image.convert('RGB')
+                width, height = image.size
+                if width < 64 or height < 64:
+                    flash('Image is too small for useful analysis. Upload an image at least 64 × 64 pixels.', 'error')
+                    return redirect(url_for('image_analysis'))
+                # A simple technical quality hint, not a determination of search completeness.
+                gray = image.convert('L').resize((min(256, width), min(256, height)))
+                contrast = ImageStat.Stat(gray).stddev[0]
+                if contrast < 18:
+                    quality = 'Low contrast — review manually'
+                elif width < 640 or height < 480:
+                    quality = 'Low resolution — review manually'
+                else:
+                    quality = 'Basic image checks passed — visual review still required'
+                save_format = {'.jpg': 'JPEG', '.jpeg': 'JPEG', '.png': 'PNG', '.webp': 'WEBP'}[suffix]
+                save_options = {'quality': 92} if save_format == 'JPEG' else {}
+                image.save(stored_path, format=save_format, optimize=True, **save_options)
+                stored_name = stored_path.name
+        except (UnidentifiedImageError, OSError, ValueError):
+            flash('The uploaded file could not be read as a valid image.', 'error')
+            return redirect(url_for('image_analysis'))
+
+        detections = []
+        analysis_mode = 'image-check-only'
+        summary = ('Image uploaded and validated. Object detection is not enabled yet; no claim about people or damage has been made.')
+        # Optional detector: install requirements-ai.txt to enable YOLO. The default web app
+        # remains lightweight and will explicitly say when the model is unavailable.
+        try:
+            from ultralytics import YOLO
+            model = YOLO(os.environ.get('RESQTRACE_YOLO_MODEL', 'yolo11n.pt'))
+            results = model(str(stored_path), verbose=False)
+            for result in results:
+                names = result.names
+                boxes = result.boxes
+                if boxes is None:
+                    continue
+                for box in boxes:
+                    class_id = int(box.cls[0].item())
+                    label = str(names.get(class_id, class_id))
+                    confidence = float(box.conf[0].item())
+                    if confidence < 0.25:
+                        continue
+                    xyxy = [round(float(value), 1) for value in box.xyxy[0].tolist()]
+                    detections.append({'label': label, 'confidence': round(confidence, 3), 'box': xyxy})
+            analysis_mode = 'yolo-object-detection'
+            people = sum(1 for item in detections if item['label'].lower() == 'person')
+            summary = f'Model detected {len(detections)} object(s), including {people} person-like detection(s). Review the image manually; detections are not confirmed survivors.'
+        except ImportError:
+            pass
+        except Exception as exc:
+            # Avoid losing a valid upload if optional model weights are not available.
+            analysis_mode = 'detector-error'
+            summary = 'Image saved, but the optional object detector could not run. Check the AI setup and review this image manually.'
+            app.logger.warning('Optional detector failed: %s', exc)
+
+        db.execute('''INSERT INTO image_analyses
+            (uploaded_by, original_name, stored_name, width, height, image_quality,
+             analysis_mode, detections_json, summary)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (g.current_user['id'], original_name, stored_name, width, height, quality,
+             analysis_mode, json.dumps(detections), summary))
+        db.commit()
+        analysis_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+        audit('image_uploaded_and_analyzed', original_name[:100])
+        return redirect(url_for('analysis_detail', analysis_id=analysis_id))
+
+    analyses = db.execute('''SELECT id, original_name, width, height, image_quality,
+        analysis_mode, summary, created_at FROM image_analyses ORDER BY id DESC LIMIT 20''').fetchall()
+    return render_template('analysis.html', analyses=analyses)
+
+
+@app.route('/analysis/<int:analysis_id>')
+@login_required
+def analysis_detail(analysis_id):
+    record = get_db().execute('''SELECT image_analyses.*, users.username AS uploader
+        FROM image_analyses LEFT JOIN users ON users.id = image_analyses.uploaded_by
+        WHERE image_analyses.id = ?''', (analysis_id,)).fetchone()
+    if not record:
+        abort(404)
+    record = dict(record)
+    record['detections'] = json.loads(record.pop('detections_json'))
+    return render_template('analysis_detail.html', record=record)
+
+
+@app.route('/analysis/<int:analysis_id>/image')
+@login_required
+def analysis_image(analysis_id):
+    record = get_db().execute('SELECT stored_name FROM image_analyses WHERE id = ?', (analysis_id,)).fetchone()
+    if not record:
+        abort(404)
+    path = UPLOAD_DIR / record['stored_name']
+    if not path.is_file():
+        abort(404)
+    mimetype = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'}.get(path.suffix.lower(), 'application/octet-stream')
+    return send_file(path, mimetype=mimetype, as_attachment=False, download_name='resqtrace-image' + path.suffix.lower())
+
+
 @app.route('/admin/users', methods=['GET', 'POST'])
 @admin_required
 def manage_users():
@@ -266,6 +412,11 @@ def create_admin(username):
     except sqlite3.IntegrityError:
         raise click.ClickException('That username already exists.')
     click.echo(f'Administrator account created for {username}.')
+
+
+@app.errorhandler(404)
+def not_found(_error):
+    return render_template('error.html', code=404, title='Not found', message='The requested record or page could not be found.'), 404
 
 
 @app.errorhandler(403)
