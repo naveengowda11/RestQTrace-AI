@@ -424,6 +424,31 @@ def logout():
     return redirect(url_for('index'))
 
 
+
+@app.route('/unknown-zones')
+@login_required
+def unknown_zones():
+    """Show image records whose evidence needs follow-up review."""
+    db = get_db()
+    rows = db.execute("""
+        SELECT id, zone_name, original_name, evidence_status, priority_score,
+               priority_reason, image_quality, inference_status, created_at
+        FROM image_analyses
+        WHERE LOWER(COALESCE(evidence_status, '')) IN
+              ('uncertain', 'outdated', 'searched_no_detection', 'no_detection', 'review')
+           OR LOWER(COALESCE(inference_status, '')) IN ('not_run', 'detector-error', 'error')
+        ORDER BY priority_score DESC, id DESC
+        LIMIT 250
+    """).fetchall()
+    unknown_zones = [dict(row) for row in rows]
+    counts = {
+        'total': len(unknown_zones),
+        'uncertain': sum(1 for row in unknown_zones if row['evidence_status'] == 'uncertain'),
+        'outdated': sum(1 for row in unknown_zones if row['evidence_status'] == 'outdated'),
+        'other': sum(1 for row in unknown_zones if row['evidence_status'] not in ('uncertain', 'outdated')),
+    }
+    return render_template('unknown-zones.html', unknown_zones=unknown_zones, counts=counts)
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
