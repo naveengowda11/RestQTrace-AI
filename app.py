@@ -14,7 +14,7 @@ from flask import (Flask, abort, flash, g, redirect, render_template, request,
                    send_file, session, url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
-from PIL import Image, ImageStat, ImageChops, ImageEnhance, UnidentifiedImageError
+from PIL import Image, ImageStat, ImageChops, ImageEnhance, ImageOps, UnidentifiedImageError
 
 BASE_DIR = Path(__file__).resolve().parent
 INSTANCE_DIR = BASE_DIR / 'instance'
@@ -42,7 +42,7 @@ app.config.update(
     SESSION_COOKIE_SAMESITE='Lax',
     SESSION_COOKIE_SECURE=os.environ.get('RESQTRACE_HTTPS', '0') == '1',
     PERMANENT_SESSION_LIFETIME=timedelta(minutes=45),
-    MAX_CONTENT_LENGTH=100 * 1024 * 1024,
+    MAX_CONTENT_LENGTH=25 * 1024 * 1024,
 )
 
 
@@ -511,35 +511,56 @@ def image_analysis():
             with Image.open(uploaded.stream) as image:
                 image.verify()
             uploaded.stream.seek(0)
-            with Image.open(uploaded.stream) as image:
-                image = image.convert('RGB')
+            with Image.open(uploaded.stream) as source:
+                # Correct phone-camera orientation before analysis.
+                image = ImageOps.exif_transpose(source)
                 width, height = image.size
                 if width < 64 or height < 64:
                     flash('Image is too small for useful analysis. Upload an image at least 64 × 64 pixels.', 'error')
                     return redirect(url_for('image_analysis'))
+                # Reject extremely large decoded images before conversion to avoid memory spikes.
+                if width * height > 30_000_000:
+                    flash('This image is too large to process safely. Export it at 6000 × 5000 pixels or smaller and upload it again.', 'error')
+                    return redirect(url_for('image_analysis'))
+                # Keep original dimensions in the database, but downscale the saved processing copy.
+                # This limits memory usage for both image checks and inference on small Render instances.
+                image = image.convert('RGB')
                 # A simple technical quality hint, not a determination of search completeness.
-                gray = image.convert('L').resize((min(256, width), min(256, height)))
-                contrast = ImageStat.Stat(gray).stddev[0]
+                gray = image.copy()
+                gray.thumbnail((256, 256))
+                contrast = ImageStat.Stat(gray.convert('L')).stddev[0]
                 if contrast < 18:
                     quality = 'Low contrast — review manually'
                 elif width < 640 or height < 480:
                     quality = 'Low resolution — review manually'
                 else:
                     quality = 'Basic image checks passed — visual review still required'
+                image.thumbnail((1600, 1600))
                 save_format = {'.jpg': 'JPEG', '.jpeg': 'JPEG', '.png': 'PNG', '.webp': 'WEBP', '.tif': 'TIFF', '.tiff': 'TIFF'}[suffix]
-                save_options = {'quality': 92} if save_format == 'JPEG' else {}
+                save_options = {'quality': 88} if save_format == 'JPEG' else {}
                 image.save(stored_path, format=save_format, optimize=True, **save_options)
                 stored_name = stored_path.name
         except (UnidentifiedImageError, OSError, ValueError):
             flash('The uploaded file could not be read as a valid image.', 'error')
             return redirect(url_for('image_analysis'))
 
-        from services.inference import run_image_analysis
-        inference = run_image_analysis(stored_path)
-        detections = inference['detections']
-        condition_results = inference['conditions']
-        person_status = inference['person_status']
-        condition_status = inference['condition_status']
+        # Inference libraries/models can fail on low-memory hosts. Preserve the uploaded
+        # image and create an explicit failed-analysis record instead of returning HTTP 500.
+        try:
+            from services.inference import run_image_analysis
+            inference = run_image_analysis(stored_path)
+            detections = inference.get('detections', [])
+            condition_results = inference.get('conditions', [])
+            person_status = inference.get('person_status', 'error')
+            condition_status = inference.get('condition_status', 'error')
+            inference_errors = inference.get('errors', [])
+        except Exception as exc:
+            app.logger.exception('Image inference failed for upload %s', stored_name)
+            detections = []
+            condition_results = []
+            person_status = 'error'
+            condition_status = 'error'
+            inference_errors = ['AI screening failed on the server. The image was saved; check Render logs and try a smaller image.']
         completed_tasks = sum(status == 'completed' for status in (person_status, condition_status))
         if completed_tasks == 2:
             analysis_mode = 'ai-screening-complete'
@@ -555,8 +576,8 @@ def image_analysis():
                        f"{condition_text} Review the original image and all outputs manually; these are not confirmed survivors or verified damage.")
         else:
             summary = 'The image was saved and validated, but AI analysis did not run. No prediction was generated. Install the AI dependencies and check the setup before retrying.'
-        if inference['errors']:
-            summary += ' ' + ' '.join(inference['errors'])
+        if inference_errors:
+            summary += ' ' + ' '.join(str(message) for message in inference_errors)
 
         evidence_status, priority_score, priority_reason = assess_evidence(
             analysis_mode, quality, detections
