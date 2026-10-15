@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Disaster Memory | ResQTrace AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/analysis.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/redesign-v2.css') }}"></head>
+<body class="dashboard-body">
+<header class="site-header dashboard-header"><nav class="nav container">
+  <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark"><svg viewBox="0 0 40 40"><path d="M20 4 34 10v10c0 8.5-5.7 13.5-14 17C11.7 33.5 6 28.5 6 20V10L20 4Z"/><path class="brand-line" d="M12 21h5l3-7 4 13 3-6h2"/></svg></span><span>ResQTrace<span class="brand-ai"> AI</span><small>DISASTER INTELLIGENCE</small></span></a>
+  <div class="dashboard-nav"><a href="{{ url_for('dashboard') }}">Dashboard</a><a href="{{ url_for('search_recommendations') }}">Search Recommendations</a><a href="{{ url_for('image_analysis') }}">Image analysis</a><a class="memory-active" href="{{ url_for('memory_map') }}">Disaster Memory</a><a href="{{ url_for('conditions_watch') }}">Conditions Watch</a><span class="signed-in-user">Signed in: <strong>{{ current_user.username }}</strong></span><form method="post" action="{{ url_for('logout') }}" class="logout-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="logout-button">Sign out</button></form></div>
+</nav></header>
+<main class="dashboard-main container memory-main">
+  <div class="dashboard-heading"><div><div class="section-kicker">ZONE HISTORY / TEMPORAL EVIDENCE</div><h1>Disaster <span>Memory.</span></h1><p>Compare recorded observations for the same named zone and review how stored evidence has changed over time.</p></div><a class="button button-primary" href="{{ url_for('image_analysis') }}">+ Add observation</a></div>
+  <div class="notice-banner"><span class="notice-icon">i</span><p><strong>How to read this page:</strong> comparisons use saved model labels, evidence status, and image-quality notes. A changed detection count is a change in model output—not proof that a real-world condition changed. Use the same zone name for follow-up images.</p></div>
+  <section class="memory-stats"><article class="metric-card"><div class="metric-top"><span>Recorded observations</span><span class="metric-icon">▤</span></div><strong>{{ total_observations }}</strong><small>Uploaded image records</small></article><article class="metric-card"><div class="metric-top"><span>Zones tracked</span><span class="metric-icon">⌖</span></div><strong>{{ total_zones }}</strong><small>Based on zone names entered</small></article><article class="metric-card"><div class="metric-top"><span>Zones with history</span><span class="metric-icon amber-icon">↻</span></div><strong>{{ zone_history|selectattr('has_comparison')|list|length }}</strong><small>At least two observations</small></article></section>
+  {% if zone_history %}
+    <div class="memory-list">
+    {% for group in zone_history %}
+      <section class="dash-card memory-zone-card">
+        <div class="memory-zone-header"><div><span class="panel-overline">TRACKED ZONE · {{ group.observation_count }} OBSERVATION{% if group.observation_count != 1 %}S{% endif %}</span><h2>{{ group.zone_name }}</h2><p>Latest observation: {{ group.latest.created_at }}</p></div><span class="table-status status-{{ group.latest.evidence_status }}">{{ group.latest.evidence_status|replace('_',' ')|title }}</span></div>
+        <div class="memory-latest-grid">
+          <div class="memory-observation"><small>LATEST IMAGE</small><a href="{{ url_for('analysis_detail', analysis_id=group.latest.id) }}"><strong>{{ group.latest.original_name }}</strong></a><span>{{ group.latest.width }} × {{ group.latest.height }} px · {{ group.latest.analysis_mode|replace('-', ' ')|title }}</span><span>Priority: <b>{{ group.latest.priority_score }}/100</b></span><p>{{ group.latest.priority_reason }}</p><a class="inspect-btn" href="{{ url_for('analysis_detail', analysis_id=group.latest.id) }}">Review latest →</a></div>
+          {% if group.previous %}
+          <div class="memory-observation previous-observation"><small>PREVIOUS IMAGE</small><a href="{{ url_for('analysis_detail', analysis_id=group.previous.id) }}"><strong>{{ group.previous.original_name }}</strong></a><span>{{ group.previous.created_at }}</span><span>{{ group.previous.detections|length }} model detection(s) recorded</span><a class="inspect-btn" href="{{ url_for('analysis_detail', analysis_id=group.previous.id) }}">Review previous →</a></div>
+          {% else %}
+          <div class="memory-observation previous-observation empty-history"><small>NO PREVIOUS OBSERVATION</small><strong>This is the first saved image for this zone.</strong><p>Upload another image with the exact same zone name to create a comparison.</p></div>
+          {% endif %}
+        </div>
+        {% if group.previous %}
+          <div class="memory-change-block"><h3>Evidence change summary</h3>
+          {% if group.changes %}<div class="change-list">{% for change in group.changes %}<div class="change-row"><strong>{{ change.label }}</strong><span class="change-before">{{ change.before }}</span><span class="change-arrow">→</span><span class="change-after">{{ change.after }}</span>{% if change.delta is not none %}<span class="change-delta">{% if change.delta > 0 %}+{% endif %}{{ change.delta }}</span>{% endif %}</div>{% endfor %}</div>
+          {% else %}<p class="no-change-note">No difference was found in the saved detection labels/counts, evidence status, or image-quality note. This does not prove the scene itself stayed unchanged.</p>{% endif %}
+          {% if group.latest.label_counts %}<div class="label-counts"><strong>Latest model labels:</strong>{% for label, count in group.latest.label_counts.items() %}<span>{{ label }} × {{ count }}</span>{% endfor %}</div>{% else %}<p class="no-change-note">No object labels were stored for the latest observation.</p>{% endif %}
+          </div>
+        {% else %}<div class="memory-change-block"><h3>Evidence change summary</h3><p class="no-change-note">Comparison becomes available after a second image is saved under this zone name.</p></div>{% endif %}
+        <details class="memory-timeline"><summary>View full observation history ({{ group.observation_count }})</summary><ol>{% for item in group.history %}<li><span class="timeline-dot"></span><div><a href="{{ url_for('analysis_detail', analysis_id=item.id) }}"><strong>{{ item.original_name }}</strong></a><small>{{ item.created_at }} · {{ item.evidence_status|replace('_',' ')|title }} · {{ item.detections|length }} detections</small></div></li>{% endfor %}</ol></details>
+      </section>
+    {% endfor %}
+    </div>
+  {% else %}
+    <section class="dash-card no-memory-records"><h2>No zone history yet</h2><p>Upload a flood image and enter a zone name. When you upload a later image using that same name, ResQTrace will compare the stored observations.</p><a class="button button-primary" href="{{ url_for('image_analysis') }}">Upload first image →</a></section>
+  {% endif %}
+  <footer class="dashboard-footer"><span>ResQTrace AI · Student prototype</span><span>Historical evidence comparison · Human review required</span></footer>
+</main></body></html>
