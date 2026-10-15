@@ -1,4 +1,4 @@
-# ResQTrace AI — Phase 1B: Authentication and Access Control
+# ResQTrace AI — Phase 1C: Authentication and Access Control
 
 A software-only student prototype for Innovation Mission 6. This version includes the landing page, a protected illustrative dashboard, SQLite-backed user accounts, admin-managed accounts, and an audit log. Disaster-zone information and priority scores remain sample data, not live emergency information.
 
@@ -56,3 +56,34 @@ This is suitable for local development and demonstration, not yet a production e
 - Live weather integration.
 - Validated risk and uncertainty models.
 - Route optimization based on verified real-world data.
+
+
+## Phase 2 — Aerial image upload and analysis
+
+The authenticated **Image analysis** page lets signed-in users upload JPG/JPEG/PNG/WEBP images up to 10 MB. Files are validated with Pillow and stored privately under `instance/uploads`; image records are stored in SQLite and can only be viewed through authenticated routes. The app records dimensions and a basic contrast/resolution hint. This is not a reliable survivor-detection or search-completeness score.
+
+### Run the basic image-validation version
+
+```powershell
+pip install -r requirements.txt
+python app.py
+```
+
+Sign in and choose **Image analysis** from the dashboard.
+
+### Optional AI object detection
+
+To enable the optional YOLO object detector, install the additional dependencies (this can be a large download and may require a compatible Python/PyTorch setup):
+
+```powershell
+pip install -r requirements-ai.txt
+```
+
+Then restart the app. On first use, Ultralytics may download model weights. You can set `RESQTRACE_YOLO_MODEL` to a locally available compatible model path. A general pretrained model may perform poorly on aerial imagery; every result needs human verification. If the optional package or model is unavailable, image validation still works and the page clearly reports that detections were not performed.
+
+### Phase 2 limitations
+
+- The default install does not include the optional AI detector.
+- Generic object detection is not a validated search-and-rescue model.
+- “No detections” never means a zone is safe or contains no survivors.
+- Image analyses are private to authenticated users in this local prototype; production deployment needs stronger storage, retention, access-control, and security review.
