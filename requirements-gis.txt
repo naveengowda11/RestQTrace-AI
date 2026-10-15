@@ -1,0 +1,3 @@
+# Optional real GeoTIFF CRS/affine transform support for GIS positioning.
+rasterio>=1.4,<2.0
+pyproj>=3.7,<4.0

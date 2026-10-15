@@ -1,0 +1,6 @@
+# Optional local inference dependencies. First run downloads model weights.
+-r requirements.txt
+ultralytics>=8.3,<9.0
+transformers>=4.45,<5.0
+torch>=2.2
+torchvision>=0.17

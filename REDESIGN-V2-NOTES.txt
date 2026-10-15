@@ -1,0 +1,12 @@
+ResQTrace AI — Karnataka UI/UX Redesign v2
+=========================================
+This update adds a global visual override stylesheet across every HTML template.
+Changes include a more compact dashboard shell, improved navigation spacing,
+denser metric cards, map-first panels, cleaner tables, responsive layouts,
+consistent form styling, and reduced unnecessary whitespace.
+
+Scope note:
+This is a visual redesign layer on the provided Phase 11 project. Existing
+routes and functionality are preserved. Live GPS and dispatch capabilities
+should be tested in the target environment before operational use. This is
+not a production-validated emergency dispatch system.
