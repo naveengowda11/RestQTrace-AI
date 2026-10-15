@@ -7,7 +7,8 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-PERSON_THRESHOLD = float(os.environ.get('RESQTRACE_PERSON_THRESHOLD', '0.25'))
+PERSON_THRESHOLD = float(os.environ.get('RESQTRACE_PERSON_THRESHOLD', '0.15'))
+PERSON_IMAGE_SIZE = int(os.environ.get('RESQTRACE_PERSON_IMAGE_SIZE', '960'))
 CONDITION_THRESHOLD = float(os.environ.get('RESQTRACE_CONDITION_THRESHOLD', '0.20'))
 
 
@@ -28,7 +29,7 @@ def _condition_pipeline():
 def detect_people(image_path):
     """Return actual detector boxes. Raises if dependencies/weights cannot run."""
     model = _person_model()
-    results = model(str(image_path), verbose=False)
+    results = model(str(image_path), conf=PERSON_THRESHOLD, imgsz=PERSON_IMAGE_SIZE, verbose=False)
     detections = []
     for result in results:
         if result.boxes is None:
